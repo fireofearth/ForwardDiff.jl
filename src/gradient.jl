@@ -51,7 +51,8 @@ end
 # result extraction #
 #####################
 
-@generated function extract_gradient(::Type{T}, y::Real, x::StaticArray) where T
+#@generated function extract_gradient(::Type{T}, y::Real, x::StaticArray) where T
+@generated function extract_gradient(::Type{T}, y::ResolvableType, x::StaticArray) where T
     result = Expr(:tuple, [:(partials(T, y, $i)) for i in 1:length(x)]...)
     V = StaticArrays.similar_type(x, valtype(y))
     return quote
@@ -60,7 +61,8 @@ end
     end
 end
 
-function extract_gradient!(::Type{T}, result::DiffResult, y::Real) where {T}
+#function extract_gradient!(::Type{T}, result::DiffResult, y::Real) where {T}
+function extract_gradient!(::Type{T}, result::DiffResult, y::ResolvableType) where {T}
     result = DiffResults.value!(result, y)
     grad = DiffResults.gradient(result)
     fill!(grad, zero(y))
@@ -73,7 +75,8 @@ function extract_gradient!(::Type{T}, result::DiffResult, dual::Dual) where {T}
     return result
 end
 
-extract_gradient!(::Type{T}, result::AbstractArray, y::Real) where {T} = fill!(result, zero(y))
+#extract_gradient!(::Type{T}, result::AbstractArray, y::Real) where {T} = fill!(result, zero(y))
+extract_gradient!(::Type{T}, result::AbstractArray, y::ResolvableType) where {T} = fill!(result, zero(y))
 extract_gradient!(::Type{T}, result::AbstractArray, dual::Dual) where {T}= copyto!(result, partials(T, dual))
 
 function extract_gradient_chunk!(::Type{T}, result, dual, index, chunksize) where {T}

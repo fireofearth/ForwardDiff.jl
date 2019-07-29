@@ -2,15 +2,23 @@
 # Dual #
 ########
 
+ #=
+ # Colin: using additional types we want to support
+=#
+using TaylorSeries: Taylor1
+using AffineArithmetic: Affine
+
 """
     ForwardDiff.can_dual(V::Type)
 
 Determines whether the type V is allowed as the scalar type in a
 Dual. By default, only `<:Real` types are allowed.
 """
-can_dual(::Type{<:Real}) = true
+can_dual(::Type{<:ResolvableType}) = true
 can_dual(::Type) = false
 
+# Colin: not sure how to subtype this...
+#struct Dual{T,V,N} <: Real
 struct Dual{T,V,N} <: Real
     value::V
     partials::Partials{N,V}
@@ -259,16 +267,21 @@ Base.eps(::Type{D}) where {D<:Dual} = eps(valtype(D))
 
 Base.rtoldefault(::Type{D}) where {D<:Dual} = Base.rtoldefault(valtype(D))
 
-Base.floor(::Type{R}, d::Dual) where {R<:Real} = floor(R, value(d))
+# Colin: floor, ceil, trunc, round are unused in ForwardDiff
+#Base.floor(::Type{R}, d::Dual) where {R<:Real} = floor(R, value(d))
+Base.floor(::Type{R}, d::Dual) where {R<:ResolvableType} = floor(R, value(d))
 Base.floor(d::Dual) = floor(value(d))
 
-Base.ceil(::Type{R}, d::Dual) where {R<:Real} = ceil(R, value(d))
+#Base.ceil(::Type{R}, d::Dual) where {R<:Real} = ceil(R, value(d))
+Base.ceil(::Type{R}, d::Dual) where {R<:ResolvableType} = ceil(R, value(d))
 Base.ceil(d::Dual) = ceil(value(d))
 
-Base.trunc(::Type{R}, d::Dual) where {R<:Real} = trunc(R, value(d))
+#Base.trunc(::Type{R}, d::Dual) where {R<:Real} = trunc(R, value(d))
+Base.trunc(::Type{R}, d::Dual) where {R<:ResolvableType} = trunc(R, value(d))
 Base.trunc(d::Dual) = trunc(value(d))
 
-Base.round(::Type{R}, d::Dual) where {R<:Real} = round(R, value(d))
+#Base.round(::Type{R}, d::Dual) where {R<:Real} = round(R, value(d))
+Base.round(::Type{R}, d::Dual) where {R<:ResolvableType} = round(R, value(d))
 Base.round(d::Dual) = round(value(d))
 
 Base.hash(d::Dual) = hash(value(d))
@@ -338,7 +351,8 @@ function Base.promote_rule(::Type{Dual{T,A,N}},
     return Dual{T,promote_type(A, B),N}
 end
 
-for R in (Irrational, Real, BigFloat, Bool)
+#for R in (Irrational, Real, BigFloat, Bool)
+for R in (Irrational, Real, BigFloat, Bool, Taylor1, Affine)
     if isconcretetype(R) # issue #322
         @eval begin
             Base.promote_rule(::Type{$R}, ::Type{Dual{T,V,N}}) where {T,V,N} = Dual{T,promote_type($R, V),N}
@@ -515,14 +529,16 @@ end
     end
 end
 
-@inline function calc_fma_xy(x::Dual{T}, y::Dual{T}, z::Real) where T
+#@inline function calc_fma_xy(x::Dual{T}, y::Dual{T}, z::Real) where T
+@inline function calc_fma_xy(x::Dual{T}, y::Dual{T}, z::ResolvableType) where T
     vx, vy = value(x), value(y)
     result = fma(vx, vy, z)
     return Dual{T}(result, _mul_partials(partials(x), partials(y), vy, vx))
 end
 
 @generated function calc_fma_xz(x::Dual{T,<:Any,N},
-                                y::Real,
+#                                y::Real,
+                                y::ResolvableType,
                                 z::Dual{T,<:Any,N}) where {T,N}
     ex = Expr(:tuple, [:(fma(partials(x)[$i], y,  partials(z)[$i])) for i in 1:N]...)
     return quote
@@ -557,14 +573,16 @@ end
     end
 end
 
-@inline function calc_muladd_xy(x::Dual{T}, y::Dual{T}, z::Real) where T
+#@inline function calc_muladd_xy(x::Dual{T}, y::Dual{T}, z::Real) where T
+@inline function calc_muladd_xy(x::Dual{T}, y::Dual{T}, z::ResolvableType) where T
     vx, vy = value(x), value(y)
     result = muladd(vx, vy, z)
     return Dual{T}(result, _mul_partials(partials(x), partials(y), vy, vx))
 end
 
 @generated function calc_muladd_xz(x::Dual{T,<:Any,N},
-                                   y::Real,
+#                                   y::Real,
+                                   y::ResolvableType,
                                    z::Dual{T,<:Any,N}) where {T,N}
     ex = Expr(:tuple, [:(muladd(partials(x)[$i], y,  partials(z)[$i])) for i in 1:N]...)
     return quote
